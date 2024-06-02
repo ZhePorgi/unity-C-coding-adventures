@@ -1,0 +1,72 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
+
+public class ObjectSpawner : MonoBehaviour
+{
+    public GameObject objectPrefab;
+    public Transform spawnParent;
+    public Slider objectCountSlider;
+    public UIManager uiManager;
+
+    private int currentObjectCount = 0;
+    private List<GameObject> objectPool = new List<GameObject>(); // Object pooling
+
+    void Start()
+    {
+        objectCountSlider.onValueChanged.AddListener(UpdateObjectCount); // Line: "slider from 2-7 with increments of 1"
+        InitializeObjectPool();
+        UpdateObjectCount(objectCountSlider.value);
+    }
+
+    void InitializeObjectPool()
+    {
+        for (int i = 0; i < 7; i++) // Initialize pool with maximum objects
+        {
+            GameObject obj = Instantiate(objectPrefab, spawnParent);
+            obj.SetActive(false);
+            objectPool.Add(obj);
+        }
+    }
+
+    void UpdateObjectCount(float value)
+    {
+        int newCount = Mathf.RoundToInt(value); // Line: "slider from 2-7 with increments of 1"
+        if (newCount > currentObjectCount)
+        {
+            for (int i = currentObjectCount; i < newCount; i++)
+            {
+                ActivateObject(i); // Activate objects from the pool
+            }
+        }
+        else if (newCount < currentObjectCount)
+        {
+            for (int i = currentObjectCount - 1; i >= newCount; i--)
+            {
+                DeactivateObject(i); // Deactivate objects back to the pool
+            }
+        }
+        currentObjectCount = newCount;
+    }
+
+    void ActivateObject(int index)
+    {
+        GameObject obj = objectPool[index];
+        obj.SetActive(true);
+        obj.GetComponent<Renderer>().material.color = uiManager.GetSelectedColor(); // Line: "select from using a color channel RGB and Black/White sliders (4 of them)"
+        obj.GetComponent<ObjectBehavior>().Initialize(uiManager.GetSelectedColor());
+        PositionObject(obj, index); // Positioning
+    }
+
+    void DeactivateObject(int index)
+    {
+        objectPool[index].SetActive(false);
+    }
+
+    void PositionObject(GameObject obj, int index)
+    {
+        // Simple positioning logic (can be enhanced)
+        float angle = 360f / currentObjectCount * index;
+        obj.transform.localPosition = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * 5f; // Circular arrangement
+    }
+}
