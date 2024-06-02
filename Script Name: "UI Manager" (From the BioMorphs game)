@@ -1,0 +1,133 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+
+public class UIManager : MonoBehaviour
+{
+    public GameObject settingsMenu; // Settings menu panel
+    public Button settingsButton; // Button to toggle settings menu
+    public Slider objectCountSlider; // Slider to select number of objects
+    public Slider redSlider; // Red color slider
+    public Slider greenSlider; // Green color slider
+    public Slider blueSlider; // Blue color slider
+    public Slider bwSlider; // Black/White color slider
+    public Button resetButton; // Button to reset the game
+    public Button startButton; // Button to start the game
+    public Button[] backgroundButtons; // Buttons to change background color
+    public GameObject[] backgroundOptions; // Background color options
+    public Text titleText; // Title text for main menu
+    public Text gameTitleText; // Title text for in-game display
+
+    private bool isSettingsMenuVisible = false;
+    private bool gameStarted = false; // To track if the game has started
+    private Color selectedColor;
+    private bool canToggleMenu = true; // To prevent rapid toggling
+
+    void Start()
+    {
+        settingsButton.onClick.AddListener(ToggleSettingsMenu); // Line: "toggle on and off the menu"
+        resetButton.onClick.AddListener(ResetGame); // Line: "there's also a reset button"
+        startButton.onClick.AddListener(StartGame); // Line: "press the start button"
+
+        redSlider.onValueChanged.AddListener(UpdateColor); // Line: "color channel RGB and Black/White sliders (4 of them)"
+        greenSlider.onValueChanged.AddListener(UpdateColor);
+        blueSlider.onValueChanged.AddListener(UpdateColor);
+        bwSlider.onValueChanged.AddListener(UpdateColor);
+
+        for (int i = 0; i < backgroundButtons.Length; i++)
+        {
+            int index = i; // Local copy for closure
+            backgroundButtons[i].onClick.AddListener(() => ChangeBackground(index)); // Line: "you can make it light with a gray accent, dark black with a dark grey accent, and the previous dark one but lighter"
+        }
+
+        UpdateColor(0); // Initialize the color
+        AnimateTitleText(); // Line: "3D text mesh before you press the start button that hovers up and down using a sort-of sine function"
+    }
+
+    void ToggleSettingsMenu()
+    {
+        if (!canToggleMenu) return;
+        isSettingsMenuVisible = !isSettingsMenuVisible;
+        StartCoroutine(ToggleMenuCoroutine()); // Line: "it will drop down using a lerp function"
+        StartCoroutine(MenuToggleCooldown());
+    }
+
+    IEnumerator ToggleMenuCoroutine()
+    {
+        float duration = 0.5f;
+        float elapsedTime = 0f;
+        Vector3 startScale = settingsMenu.transform.localScale;
+        Vector3 endScale = isSettingsMenuVisible ? Vector3.one : Vector3.zero;
+
+        while (elapsedTime < duration)
+        {
+            settingsMenu.transform.localScale = Vector3.Lerp(startScale, endScale, elapsedTime / duration); // Line: "it will drop down using a lerp function"
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        settingsMenu.transform.localScale = endScale;
+        settingsButton.image.color = isSettingsMenuVisible ? Color.gray : Color.white; // Line: "button waits a bit before turning back to its normal color without the blacker tint to it"
+    }
+
+    IEnumerator MenuToggleCooldown()
+    {
+        canToggleMenu = false;
+        yield return new WaitForSeconds(1f); // Cooldown period
+        canToggleMenu = true;
+    }
+
+    void UpdateColor(float value)
+    {
+        selectedColor = new Color(redSlider.value, greenSlider.value, blueSlider.value, 1 - bwSlider.value); // Line: "color channel RGB and Black/White sliders (4 of them)"
+        ObjectBehavior.SetGlobalTintColor(selectedColor); // Line: "also changes the color of every object"
+    }
+
+    void ChangeBackground(int index)
+    {
+        for (int i = 0; i < backgroundOptions.Length; i++)
+        {
+            backgroundOptions[i].SetActive(i == index); // Line: "you can make it light with a gray accent, dark black with a dark grey accent, and the previous dark one but lighter"
+            backgroundButtons[i].interactable = i != index; // Ensure only one background is selected at a time
+        }
+    }
+
+    void ResetGame()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex); // Line: "there's also a reset button"
+    }
+
+    void StartGame()
+    {
+        gameStarted = true; // Indicate that the game has started
+        UnityEngine.SceneManagement.SceneManager.LoadScene("GameScene"); // Load the game scene
+    }
+
+    void AnimateTitleText()
+    {
+        StartCoroutine(HoverTitleText()); // Line: "3D text mesh before you press the start button that hovers up and down using a sort-of sine function"
+    }
+
+    IEnumerator HoverTitleText()
+    {
+        float hoverSpeed = 2.0f;
+        float hoverHeight = 20.0f;
+
+        while (true)
+        {
+            float newY = Mathf.Sin(Time.time * hoverSpeed) * hoverHeight;
+            titleText.transform.localPosition = new Vector3(titleText.transform.localPosition.x, newY, titleText.transform.localPosition.z); // Line: "hovers up and down using a sort-of sine function"
+            yield return null;
+        }
+    }
+
+    public Color GetSelectedColor()
+    {
+        return selectedColor; // Line: "color that you can select from using a color channel RGB and Black/White sliders (4 of them)"
+    }
+
+    public bool IsGameStarted()
+    {
+        return gameStarted; // To check if the game has started
+    }
+}
