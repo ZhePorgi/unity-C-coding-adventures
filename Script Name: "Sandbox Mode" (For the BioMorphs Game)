@@ -1,0 +1,260 @@
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
+
+public class SandboxMode : MonoBehaviour
+{
+    public GameObject objectPrefab;
+    public Transform sandboxParent;
+    public Slider sizeSlider;
+    public UIManager uiManager;
+    public Button saveButton;
+    public Button loadButton;
+    public Button deleteButton;
+    public Button resetButton;
+    public InputField seedInputField;
+    public InputField parentInputField;
+    public Text seedText;
+    public Text parentText;
+    public Button ancestorViewButton;
+    public GameObject ancestorViewPanel;
+    public Button undoButton;
+    public Button redoButton;
+    public GameObject storagePanel; // Toggleable storage panel
+    public GameObject storageItemPrefab; // Prefab for each storage item
+    public Button toggleStorageButton; // Button to toggle storage panel visibility
+
+    private List<GameObject> savedObjects = new List<GameObject>();
+    private GameObject currentObject;
+    private Stack<GameObject> undoStack = new Stack<GameObject>();
+    private Stack<GameObject> redoStack = new Stack<GameObject>();
+
+    void Start()
+    {
+        sizeSlider.onValueChanged.AddListener(UpdateObjectSize);
+        saveButton.onClick.AddListener(SaveObject);
+        loadButton.onClick.AddListener(LoadObjects);
+        deleteButton.onClick.AddListener(DeleteObject);
+        resetButton.onClick.AddListener(ResetSandbox);
+        undoButton.onClick.AddListener(UndoAction);
+        redoButton.onClick.AddListener(RedoAction);
+
+        ancestorViewButton.onClick.AddListener(ToggleAncestorView);
+        seedInputField.onValueChanged.AddListener(UpdateSeed);
+        parentInputField.onValueChanged.AddListener(UpdateParent);
+
+        toggleStorageButton.onClick.AddListener(ToggleStoragePanel); // Toggle storage panel visibility
+
+        LoadStoredObjects();
+    }
+
+    void UpdateObjectSize(float value)
+    {
+        if (currentObject != null)
+        {
+            currentObject.transform.localScale = Vector3.one * value;
+        }
+    }
+
+    void SaveObject()
+    {
+        if (currentObject != null)
+        {
+            savedObjects.Add(currentObject);
+            undoStack.Push(currentObject);
+            redoStack.Clear();
+            SaveObjectToFile(currentObject);
+            DisplaySavedObject(currentObject);
+            currentObject = null;
+        }
+    }
+
+    void LoadObjects()
+    {
+        foreach (GameObject obj in savedObjects)
+        {
+            Instantiate(obj, sandboxParent);
+        }
+    }
+
+    void DeleteObject()
+    {
+        if (currentObject != null)
+        {
+            savedObjects.Remove(currentObject);
+            undoStack.Push(currentObject);
+            redoStack.Clear();
+            Destroy(currentObject);
+        }
+    }
+
+    void ResetSandbox()
+    {
+        foreach (Transform child in sandboxParent)
+        {
+            Destroy(child.gameObject);
+        }
+        savedObjects.Clear();
+        undoStack.Clear();
+        redoStack.Clear();
+    }
+
+    public void CreateNewObject()
+    {
+        currentObject = Instantiate(objectPrefab, sandboxParent);
+        currentObject.GetComponent<Renderer>().material.color = uiManager.GetSelectedColor();
+        undoStack.Clear();
+        redoStack.Clear();
+    }
+
+    void ToggleAncestorView()
+    {
+        ancestorViewPanel.SetActive(!ancestorViewPanel.activeSelf);
+        if (currentObject != null)
+        {
+            seedText.text = currentObject.GetComponent<ObjectBehavior>().GetSeed();
+            parentText.text = currentObject.GetComponent<ObjectBehavior>().GetParent();
+        }
+    }
+
+    void UpdateSeed(string seed)
+    {
+        if (currentObject != null)
+        {
+            currentObject.GetComponent<ObjectBehavior>().SetSeed(seed);
+        }
+    }
+
+    void UpdateParent(string parent)
+    {
+        if (currentObject != null)
+        {
+            currentObject.GetComponent<ObjectBehavior>().SetParent(parent);
+        }
+    }
+
+    public void UndoAction()
+    {
+        if (undoStack.Count > 0)
+        {
+            GameObject lastAction = undoStack.Pop();
+            redoStack.Push(lastAction);
+            lastAction.SetActive(false);
+        }
+    }
+
+    public void RedoAction()
+    {
+        if (redoStack.Count > 0)
+        {
+            GameObject lastUndo = redoStack.Pop();
+            undoStack.Push(lastUndo);
+            lastUndo.SetActive(true);
+        }
+    }
+
+    void SaveObjectToFile(GameObject obj)
+    {
+        string path = Application.persistentDataPath + "/savedObjects.dat";
+        List<ObjectData> objectDataList = LoadSavedData();
+
+        ObjectData data = new ObjectData
+        {
+            seed = obj.GetComponent<ObjectBehavior>().GetSeed(),
+            parent = obj.GetComponent<ObjectBehavior>().GetParent(),
+            color = obj.GetComponent<Renderer>().material.color
+        };
+
+        objectDataList.Add(data);
+
+        BinaryFormatter formatter = new BinaryFormatter();
+        using (FileStream file = File.Create(path))
+        {
+            formatter.Serialize(file, objectDataList);
+        }
+    }
+
+    List<ObjectData> LoadSavedData()
+    {
+        string path = Application.persistentDataPath + "/savedObjects.dat";
+        if (File.Exists(path))
+        {
+            BinaryFormatter formatter = new BinaryFormatter();
+            using (FileStream file = File.Open(path, FileMode.Open))
+            {
+                return (List<ObjectData>)formatter.Deserialize(file);
+            }
+        }
+        return new List<ObjectData>();
+    }
+
+    void LoadStoredObjects()
+    {
+        List<ObjectData> objectDataList = LoadSavedData();
+
+        foreach (ObjectData data in objectDataList)
+        {
+            GameObject obj = Instantiate(objectPrefab, sandboxParent);
+            obj.GetComponent<ObjectBehavior>().SetSeed(data.seed);
+            obj.GetComponent<ObjectBehavior>().SetParent(data.parent);
+            obj.GetComponent<Renderer>().material.color = data.color;
+
+            savedObjects.Add(obj);
+            DisplaySavedObject(obj);
+        }
+    }
+
+    void DisplaySavedObject(GameObject obj)
+    {
+        GameObject item = Instantiate(storageItemPrefab, storagePanel.transform);
+        item.GetComponentInChildren<Text>().text = "Seed: " + obj.GetComponent<ObjectBehavior>().GetSeed();
+        Button deleteButton = item.GetComponentInChildren<Button>();
+        deleteButton.onClick.AddListener(() => DeleteSavedObject(obj, item));
+    }
+
+    void DeleteSavedObject(GameObject obj, GameObject item)
+    {
+        savedObjects.Remove(obj);
+        Destroy(obj);
+        Destroy(item);
+        SaveCurrentState();
+    }
+
+    void SaveCurrentState()
+    {
+        string path = Application.persistentDataPath + "/savedObjects.dat";
+        List<ObjectData> objectDataList = new List<ObjectData>();
+
+        foreach (GameObject obj in savedObjects)
+        {
+            ObjectData data = new ObjectData
+            {
+                seed = obj.GetComponent<ObjectBehavior>().GetSeed(),
+                parent = obj.GetComponent<ObjectBehavior>().GetParent(),
+                color = obj.GetComponent<Renderer>().material.color
+            };
+            objectDataList.Add(data);
+        }
+
+        BinaryFormatter formatter = new BinaryFormatter();
+        using (FileStream file = File.Create(path))
+        {
+            formatter.Serialize(file, objectDataList);
+        }
+    }
+
+    void ToggleStoragePanel()
+    {
+        storagePanel.SetActive(!storagePanel.activeSelf);
+    }
+}
+
+[System.Serializable]
+public class ObjectData
+{
+    public string seed;
+    public string parent;
+    public Color color;
+}
