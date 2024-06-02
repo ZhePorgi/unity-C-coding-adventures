@@ -1,0 +1,112 @@
+using UnityEngine;
+
+public class ObjectBehavior : MonoBehaviour
+{
+    private Vector3 originalScale;
+    private Renderer objectRenderer;
+    private static Color globalTintColor;
+    private string seed;
+    private string parent;
+    private bool isScaling = false; // Prevent multiple scaling
+
+    void Start()
+    {
+        originalScale = transform.localScale;
+        objectRenderer = GetComponent<Renderer>();
+    }
+
+    public void Initialize(Color initialColor)
+    {
+        objectRenderer.material.color = initialColor;
+        seed = GenerateRandomSeed(); // Line: "a seed which is just a same sized value of x number of digits in a particular order"
+        parent = "None"; // Placeholder value
+    }
+
+    void OnMouseDown()
+    {
+        if (!isScaling)
+        {
+            StartCoroutine(AnimateScale()); // Line: "it gets a bit bigger using lerp but then gets smaller back to its set size"
+            ApplyTintColor(); // Line: "also changes the color of every object of the bio morph to be more tinted of a certain color"
+        }
+    }
+
+    IEnumerator AnimateScale()
+    {
+        isScaling = true;
+        float duration = 0.5f;
+        float elapsedTime = 0f;
+        Vector3 targetScale = originalScale * 1.2f;
+
+        while (elapsedTime < duration)
+        {
+            transform.localScale = Vector3.Lerp(originalScale, targetScale, elapsedTime / duration); // Line: "it gets a bit bigger using lerp"
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            transform.localScale = Vector3.Lerp(targetScale, originalScale, elapsedTime / duration); // Line: "but then gets smaller back to its set size"
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.localScale = originalScale;
+        isScaling = false;
+    }
+
+    void ApplyTintColor()
+    {
+        foreach (var obj in FindObjectsOfType<ObjectBehavior>())
+        {
+            obj.SetTintColor(globalTintColor); // Line: "also changes the color of every object of the bio morph to be more tinted of a certain color"
+        }
+    }
+
+    public static void SetGlobalTintColor(Color color)
+    {
+        globalTintColor = color;
+    }
+
+    public void SetTintColor(Color color)
+    {
+        if (objectRenderer != null)
+        {
+            objectRenderer.material.color = color; // Line: "also changes the color of every object of the bio morph to be more tinted of a certain color"
+        }
+    }
+
+    public string GetSeed()
+    {
+        return seed; // Line: "a seed which is just a same sized value of x number of digits in a particular order"
+    }
+
+    public void SetSeed(string newSeed)
+    {
+        seed = newSeed; // Line: "a seed which is just a same sized value of x number of digits in a particular order"
+    }
+
+    public string GetParent()
+    {
+        return parent; // Line: "a parent object which is like the prompt for it"
+    }
+
+    public void SetParent(string newParent)
+    {
+        parent = newParent; // Line: "a parent object which is like the prompt for it"
+    }
+
+    private string GenerateRandomSeed()
+    {
+        // Generate a random seed (10-digit string)
+        string newSeed = "";
+        for (int i = 0; i < 10; i++)
+        {
+            newSeed += Random.Range(0, 10).ToString(); // Line: "a seed which is just a same sized value of x number of digits in a particular order"
+        }
+        return newSeed;
+    }
+}
