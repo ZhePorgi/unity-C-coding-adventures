@@ -1,0 +1,70 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+public class BioMorphEvolution : MonoBehaviour
+{
+    public GameObject[] objectPrefabs;
+    public Transform spawnParent;
+    public int initialObjectCount = 5;
+    public float mutationRate = 0.1f; // Line: "the higher the MRA is (mutation rate average), the more different (on average) child objects (offspring) will be from their parents (the selected objects)"
+    public Slider mutationRateSlider; // Additional feature for dynamic adjustment
+
+    private List<GameObject> currentObjects = new List<GameObject>();
+
+    void Start()
+    {
+        for (int i = 0; i < initialObjectCount; i++)
+        {
+            SpawnRandomObject(); // Line: "set number of genes that control the type of object that gets created"
+        }
+
+        mutationRateSlider.onValueChanged.AddListener(UpdateMutationRate); // Dynamic adjustment for mutation rate
+    }
+
+    void SpawnRandomObject()
+    {
+        GameObject prefab = objectPrefabs[Random.Range(0, objectPrefabs.Length)];
+        GameObject newObj = Instantiate(prefab, spawnParent);
+        newObj.GetComponent<Renderer>().material.color = Random.ColorHSV();
+        currentObjects.Add(newObj);
+    }
+
+    public void Evolve()
+    {
+        List<GameObject> newGeneration = new List<GameObject>();
+
+        foreach (GameObject parent in currentObjects)
+        {
+            GameObject child = Instantiate(parent, spawnParent); // Create a copy of the parent object
+            Mutate(child); // Apply mutations to the child object
+            newGeneration.Add(child);
+        }
+
+        foreach (GameObject obj in currentObjects)
+        {
+            Destroy(obj); // Destroy the old generation
+        }
+
+        currentObjects = newGeneration; // Update the current generation
+    }
+
+    void Mutate(GameObject obj)
+    {
+        Transform objTransform = obj.transform;
+        
+        // Mutate scale
+        objTransform.localScale += Vector3.one * Random.Range(-mutationRate, mutationRate);
+        
+        // Mutate rotation
+        objTransform.rotation = Random.rotation;
+        
+        // Additional mutations: position and color
+        objTransform.localPosition += new Vector3(Random.Range(-mutationRate, mutationRate), 0, Random.Range(-mutationRate, mutationRate));
+        obj.GetComponent<Renderer>().material.color = Random.ColorHSV();
+    }
+
+    void UpdateMutationRate(float value)
+    {
+        mutationRate = value; // Update mutation rate dynamically
+    }
+}
